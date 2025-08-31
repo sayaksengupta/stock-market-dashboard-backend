@@ -31,20 +31,16 @@ app.use(
 
 app.use(express.json());
 
-// Routes
 app.use("/api/stocks", stockRoutes);
 
-// WebSocket connection
 io.on("connection", (socket) => {
   console.log("Client connected");
 
-  // Client subscribes to stock symbols (array)
   socket.on("subscribe", (symbols) => {
     console.log(`Client subscribed to: ${symbols}`);
-    startPolling(symbols, io); // Start polling for these symbols
+    startPolling(symbols, io); 
   });
 
-  // Client unsubscribes
   socket.on("unsubscribe", (symbols) => {
     console.log(`Client unsubscribed from: ${symbols}`);
     stopPolling(symbols);

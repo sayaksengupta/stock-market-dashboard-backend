@@ -1,27 +1,22 @@
 const axios = require('axios');
 
-// In-memory cache to reduce API calls
 const cache = {};
-const CACHE_DURATION = 60 * 1000; // Cache for 1 minute
+const CACHE_DURATION = 60 * 1000; 
 
-// Financial Modeling Prep API configuration
 const FMP_BASE_URL = process.env.FMP_BASE_URL;
 const API_KEY = process.env.FMP_API_KEY;
 
-// Helper to calculate change and % change
 const calculateChange = (currentPrice, previousClose) => {
   const change = currentPrice - previousClose;
   const percentChange = ((change / previousClose) * 100).toFixed(2);
   return { change: change.toFixed(2), percentChange };
 };
 
-// Controller: Fetch real-time stock quote
 exports.getStockQuote = async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const cacheKey = `quote_${symbol}`;
   const now = Date.now();
 
-  // Check cache
   if (cache[cacheKey] && now - cache[cacheKey].timestamp < CACHE_DURATION) {
     return res.json(cache[cacheKey].data);
   }
@@ -33,13 +28,13 @@ exports.getStockQuote = async (req, res) => {
       },
     });
 
-    const quoteData = response.data[0]; // FMP returns an array
+    const quoteData = response.data[0]; 
     if (!quoteData || !quoteData.price) {
       return res.status(404).json({ error: 'Invalid symbol or no data available' });
     }
 
     const currentPrice = parseFloat(quoteData.price);
-    const previousClose = parseFloat(quoteData.previousClose || quoteData.price); // Fallback if no previousClose
+    const previousClose = parseFloat(quoteData.previousClose || quoteData.price); 
     const { change, percentChange } = calculateChange(currentPrice, previousClose);
 
     const stockData = {
@@ -47,7 +42,7 @@ exports.getStockQuote = async (req, res) => {
       price: currentPrice.toFixed(2),
       change,
       percentChange,
-      lastUpdated: new Date().toISOString().split('T')[0], // Current date as FMP doesn't provide trading day
+      lastUpdated: new Date().toISOString().split('T')[0], 
     };
 
     // Update cache
@@ -60,13 +55,13 @@ exports.getStockQuote = async (req, res) => {
   }
 };
 
-// Controller: Fetch historical stock data for charts
+
 exports.getStockHistory = async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const cacheKey = `history_${symbol}`;
   const now = Date.now();
 
-  // Check cache
+
   if (cache[cacheKey] && now - cache[cacheKey].timestamp < CACHE_DURATION) {
     return res.json(cache[cacheKey].data);
   }
@@ -75,7 +70,7 @@ exports.getStockHistory = async (req, res) => {
     const response = await axios.get(`${FMP_BASE_URL}/historical-price-full/${symbol}`, {
       params: {
         apikey: API_KEY,
-        timeseries: 100, // Last 100 days
+        timeseries: 100, 
       },
     });
 
@@ -84,15 +79,14 @@ exports.getStockHistory = async (req, res) => {
       return res.status(404).json({ error: 'Invalid symbol or no data available' });
     }
 
-    // Transform data for charting
+
     const historyData = timeSeries
       .map((day) => ({
         date: day.date,
         price: parseFloat(day.close).toFixed(2),
       }))
-      .sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort ascending
+      .sort((a, b) => new Date(a.date) - new Date(b.date)); 
 
-    // Update cache
     cache[cacheKey] = { data: historyData, timestamp: now };
 
     res.json(historyData);
