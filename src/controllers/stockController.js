@@ -4,9 +4,9 @@ const axios = require('axios');
 const cache = {};
 const CACHE_DURATION = 60 * 1000; // Cache for 1 minute
 
-// Alpha Vantage API configuration
-const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
-const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+// Financial Modeling Prep API configuration
+const FMP_BASE_URL = process.env.FMP_BASE_URL;
+const API_KEY = process.env.FMP_API_KEY;
 
 // Helper to calculate change and % change
 const calculateChange = (currentPrice, previousClose) => {
@@ -27,29 +27,27 @@ exports.getStockQuote = async (req, res) => {
   }
 
   try {
-    const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
+    const response = await axios.get(`${FMP_BASE_URL}/quote/${symbol}`, {
       params: {
-        function: 'GLOBAL_QUOTE',
-        symbol,
         apikey: API_KEY,
       },
     });
 
-    const quoteData = response.data['Global Quote'];
-    if (!quoteData || !quoteData['05. price']) {
+    const quoteData = response.data[0]; // FMP returns an array
+    if (!quoteData || !quoteData.price) {
       return res.status(404).json({ error: 'Invalid symbol or no data available' });
     }
 
-    const currentPrice = parseFloat(quoteData['05. price']);
-    const previousClose = parseFloat(quoteData['08. previous close']);
+    const currentPrice = parseFloat(quoteData.price);
+    const previousClose = parseFloat(quoteData.previousClose || quoteData.price); // Fallback if no previousClose
     const { change, percentChange } = calculateChange(currentPrice, previousClose);
 
     const stockData = {
-      symbol: quoteData['01. symbol'],
+      symbol: quoteData.symbol,
       price: currentPrice.toFixed(2),
       change,
       percentChange,
-      lastUpdated: quoteData['07. latest trading day'],
+      lastUpdated: new Date().toISOString().split('T')[0], // Current date as FMP doesn't provide trading day
     };
 
     // Update cache
@@ -74,25 +72,23 @@ exports.getStockHistory = async (req, res) => {
   }
 
   try {
-    const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
+    const response = await axios.get(`${FMP_BASE_URL}/historical-price-full/${symbol}`, {
       params: {
-        function: 'TIME_SERIES_DAILY',
-        symbol,
-        outputsize: 'compact', // Last 100 days
         apikey: API_KEY,
+        timeseries: 100, // Last 100 days
       },
     });
 
-    const timeSeries = response.data['Time Series (Daily)'];
+    const timeSeries = response.data.historical;
     if (!timeSeries) {
       return res.status(404).json({ error: 'Invalid symbol or no data available' });
     }
 
     // Transform data for charting
-    const historyData = Object.entries(timeSeries)
-      .map(([date, values]) => ({
-        date,
-        price: parseFloat(values['4. close']).toFixed(2),
+    const historyData = timeSeries
+      .map((day) => ({
+        date: day.date,
+        price: parseFloat(day.close).toFixed(2),
       }))
       .sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort ascending
 

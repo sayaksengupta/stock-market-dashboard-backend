@@ -1,10 +1,10 @@
 const axios = require('axios');
 
 // Reuse controller helpers for consistency
-const { calculateChange } = require('../controllers/stockController'); // Assuming we export this; add export if needed
+const { calculateChange } = require('../controllers/stockController');
 
-const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
-const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const FMP_BASE_URL = process.env.FMP_BASE_URL;
+const API_KEY = process.env.FMP_API_KEY;
 const POLL_INTERVAL = 5000; // 5 seconds
 
 let subscribedSymbols = new Set(); // Track unique symbols
@@ -19,6 +19,7 @@ const startPolling = (newSymbols, io) => {
       for (const symbol of subscribedSymbols) {
         try {
           const data = await fetchStockData(symbol);
+          console.log(data)
           io.emit('stockUpdate', data); // Emit to all clients
         } catch (error) {
           console.error(`Error polling ${symbol}:`, error.message);
@@ -39,29 +40,28 @@ const stopPolling = (symbolsToRemove) => {
 };
 
 async function fetchStockData(symbol) {
-  const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
+  const response = await axios.get(`${FMP_BASE_URL}/quote/${symbol}`, {
     params: {
-      function: 'GLOBAL_QUOTE',
-      symbol,
       apikey: API_KEY,
     },
   });
 
-  const quoteData = response.data['Global Quote'];
-  if (!quoteData || !quoteData['05. price']) {
+
+  const quoteData = response.data[0];
+  if (!quoteData || !quoteData.price) {
     throw new Error('Invalid data');
   }
 
-  const currentPrice = parseFloat(quoteData['05. price']);
-  const previousClose = parseFloat(quoteData['08. previous close']);
+  const currentPrice = parseFloat(quoteData.price);
+  const previousClose = parseFloat(quoteData.previousClose || quoteData.price); // Fallback if no previousClose
   const { change, percentChange } = calculateChange(currentPrice, previousClose);
 
   return {
-    symbol: quoteData['01. symbol'],
+    symbol: quoteData.symbol,
     price: currentPrice.toFixed(2),
     change,
     percentChange,
-    lastUpdated: quoteData['07. latest trading day'],
+    lastUpdated: new Date().toISOString().split('T')[0],
   };
 }
 
