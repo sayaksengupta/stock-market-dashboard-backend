@@ -1,16 +1,14 @@
 const axios = require('axios');
 
-// Reuse controller helpers for consistency
 const { calculateChange } = require('../controllers/stockController');
 
 const FMP_BASE_URL = process.env.FMP_BASE_URL;
 const API_KEY = process.env.FMP_API_KEY;
-const POLL_INTERVAL = 5000; // 5 seconds
+const POLL_INTERVAL = 5000;
 
-let subscribedSymbols = new Set(); // Track unique symbols
+let subscribedSymbols = new Set(); 
 let pollIntervalId = null;
 
-// Start polling for symbols
 const startPolling = (newSymbols, io) => {
   newSymbols.forEach(symbol => subscribedSymbols.add(symbol.toUpperCase()));
 
@@ -20,7 +18,7 @@ const startPolling = (newSymbols, io) => {
         try {
           const data = await fetchStockData(symbol);
           console.log(data)
-          io.emit('stockUpdate', data); // Emit to all clients
+          io.emit('stockUpdate', data); 
         } catch (error) {
           console.error(`Error polling ${symbol}:`, error.message);
         }
@@ -29,7 +27,6 @@ const startPolling = (newSymbols, io) => {
   }
 };
 
-// Stop polling for symbols
 const stopPolling = (symbolsToRemove) => {
   symbolsToRemove.forEach(symbol => subscribedSymbols.delete(symbol.toUpperCase()));
 
@@ -53,7 +50,7 @@ async function fetchStockData(symbol) {
   }
 
   const currentPrice = parseFloat(quoteData.price);
-  const previousClose = parseFloat(quoteData.previousClose || quoteData.price); // Fallback if no previousClose
+  const previousClose = parseFloat(quoteData.previousClose || quoteData.price); 
   const { change, percentChange } = calculateChange(currentPrice, previousClose);
 
   return {
