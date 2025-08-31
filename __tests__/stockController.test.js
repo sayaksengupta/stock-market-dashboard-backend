@@ -6,9 +6,7 @@ const mock = new MockAdapter(axios);
 
 describe('Stock Controller', () => {
   beforeEach(() => {
-    // Mock Date.now for consistent timestamps
     jest.spyOn(global.Date, 'now').mockReturnValue(new Date('2025-08-30T00:00:00Z').getTime());
-    // Clear cache before each test
     Object.keys(cache).forEach(key => delete cache[key]);
   });
 
@@ -23,14 +21,9 @@ describe('Stock Controller', () => {
   });
 
   test('getStockQuote fetches and processes data', async () => {
-    mock.onGet().reply(200, {
-      'Global Quote': {
-        '01. symbol': 'AAPL',
-        '05. price': '150.00',
-        '08. previous close': '145.00',
-        '07. latest trading day': '2025-08-30'
-      }
-    });
+    mock.onGet(/quote/).reply(200, [
+      { symbol: 'AAPL', price: 150.00, previousClose: 145.00 }
+    ]);
 
     const req = { params: { symbol: 'aapl' } };
     const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
@@ -40,7 +33,7 @@ describe('Stock Controller', () => {
       symbol: 'AAPL',
       price: '150.00',
       change: '5.00',
-      percentChange: '3.45'
+      percentChange: '3.45',
     }));
   });
 
@@ -48,7 +41,7 @@ describe('Stock Controller', () => {
     const cacheKey = 'quote_AAPL';
     const cachedData = {
       data: { symbol: 'AAPL', price: '150.00', change: '5.00', percentChange: '3.45' },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     cache[cacheKey] = cachedData;
 
@@ -57,18 +50,13 @@ describe('Stock Controller', () => {
 
     await getStockQuote(req, res);
     expect(res.json).toHaveBeenCalledWith(cachedData.data);
-    expect(mock.history.get.length).toBe(0); // No API call made
+    expect(mock.history.get.length).toBe(0);
   });
 
   test('getStockQuote updates cache on new fetch', async () => {
-    mock.onGet().reply(200, {
-      'Global Quote': {
-        '01. symbol': 'AAPL',
-        '05. price': '150.00',
-        '08. previous close': '145.00',
-        '07. latest trading day': '2025-08-30'
-      }
-    });
+    mock.onGet(/quote/).reply(200, [
+      { symbol: 'AAPL', price: 150.00, previousClose: 145.00 }
+    ]);
 
     const req = { params: { symbol: 'aapl' } };
     const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
@@ -77,12 +65,12 @@ describe('Stock Controller', () => {
     expect(cache['quote_AAPL']).toBeDefined();
     expect(cache['quote_AAPL'].data).toMatchObject({
       symbol: 'AAPL',
-      price: '150.00'
+      price: '150.00',
     });
   });
 
   test('getStockQuote handles invalid symbol', async () => {
-    mock.onGet().reply(200, {});
+    mock.onGet(/quote/).reply(200, []);
 
     const req = { params: { symbol: 'invalid' } };
     const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
@@ -93,7 +81,7 @@ describe('Stock Controller', () => {
   });
 
   test('getStockQuote handles API error', async () => {
-    mock.onGet().reply(500);
+    mock.onGet(/quote/).reply(500);
 
     const req = { params: { symbol: 'aapl' } };
     const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
@@ -104,11 +92,11 @@ describe('Stock Controller', () => {
   });
 
   test('getStockHistory fetches and transforms data', async () => {
-    mock.onGet().reply(200, {
-      'Time Series (Daily)': {
-        '2025-08-30': { '4. close': '150.00' },
-        '2025-08-29': { '4. close': '145.00' }
-      }
+    mock.onGet(/historical-price-full/).reply(200, {
+      historical: [
+        { date: '2025-08-29', close: 145.00 },
+        { date: '2025-08-30', close: 150.00 },
+      ],
     });
 
     const req = { params: { symbol: 'aapl' } };
@@ -117,7 +105,7 @@ describe('Stock Controller', () => {
     await getStockHistory(req, res);
     expect(res.json).toHaveBeenCalledWith([
       { date: '2025-08-29', price: '145.00' },
-      { date: '2025-08-30', price: '150.00' }
+      { date: '2025-08-30', price: '150.00' },
     ]);
   });
 
@@ -125,7 +113,7 @@ describe('Stock Controller', () => {
     const cacheKey = 'history_AAPL';
     const cachedData = {
       data: [{ date: '2025-08-29', price: '145.00' }],
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     cache[cacheKey] = cachedData;
 
@@ -138,10 +126,8 @@ describe('Stock Controller', () => {
   });
 
   test('getStockHistory updates cache on new fetch', async () => {
-    mock.onGet().reply(200, {
-      'Time Series (Daily)': {
-        '2025-08-30': { '4. close': '150.00' }
-      }
+    mock.onGet(/historical-price-full/).reply(200, {
+      historical: [{ date: '2025-08-30', close: 150.00 }],
     });
 
     const req = { params: { symbol: 'aapl' } };
@@ -153,7 +139,7 @@ describe('Stock Controller', () => {
   });
 
   test('getStockHistory handles API error', async () => {
-    mock.onGet().reply(500);
+    mock.onGet(/historical-price-full/).reply(500);
 
     const req = { params: { symbol: 'aapl' } };
     const res = { json: jest.fn(), status: jest.fn().mockReturnThis() };
